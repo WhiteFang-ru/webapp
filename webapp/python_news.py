@@ -9,8 +9,11 @@
 # в него заложена дата публикации новости
 # 3) копирую исходный текст с помощью requests
 
-import requests
 from bs4 import BeautifulSoup
+from datetime import datetime
+import requests
+from webapp.model import db, News
+
 
 def get_html(url):
     try:
@@ -30,27 +33,44 @@ def get_python_news():
             # findAll возвращает ВСЕ эл-ты искомого вида. class_ с подчеркиванием, потому что это очень частый атрибут
             # из вытащенного полного 'ul' блока выгрызаем все 'li' (т е собственно текст новостей). Получаем список из 'li'
             # print(all_news)
-        result_news = []  # список для коллекционирования новостей
+        # result_news = []  # список для коллекционирования новостей (ранняя редакция)
         for news in all_news:  # кроме самой новости нам нужны: заголовок, дата публикации
             title = news.find('a').text  # заголовок новости в исходном коде лежит внутри 'h3 -> a + link'
                 # text - это то, что между открывающим и закрывающим тегом
                 # print(title)
             url = news.find('a')['href']  #  ссылка на текст новости, вытаскиваем из атрибута href как из эл-та словаря
-            published = news.find('time').text  # 'text' это property, поэтому запрашивается через точку
-            result_news.append({   # в список добавляем все 3 хар-ки новости через append({СЛОВАРЬ})
-                'title': title,
-                'url': url,
-                'published': published
-            })
-        return result_news   #  получаем список из словарей, проверяем результат через 'print'
+            published = news.find('time').text  # 'text' это property, поэтому запрашивается через точку. Время в формате 'string'
+            try:
+                published = datetime.strptime(published, '%B %d, %Y')  #  переводим время в формат 'datetime'
+            except ValueError:
+                published = datetime.now()
+            save_news(title, url, published)  # вызываем функцию сохранения новости в БД
+            # result_news.append({   # в список добавляем все 3 хар-ки новости через append({СЛОВАРЬ})
+            #     'title': title,
+            #     'url': url,
+            #     'published': published
+            # })
+        # return result_news   #  получаем список из словарей, проверяем результат через 'print'
 
-    return False
+    # return False
 
 # после if html задается это действие, так генерится файл .html с исходным кодом страницы, которую мы парсим
             # with open("python_org_news.html", "w", encoding="utf-8") as f:
             #     f.write(html)
+def save_news(title, url, published):  # задаю функцию для записи новости в БД
+    news_exists = News.query.filter(News.url == url).count()   # проверяем, есть ли новость уже в БД (по уникальному url):
+        # query - делает выборку News, filter ограничивает эту выборку, count считает кол-во новостей с таким url
+    print(news_exists)
+    if not news_exists:
+        new_News = News(title=title, url=url, published=published) # кладем новый объект класса 'News' в переменную, id и text
+                                                # прописывать не нужно, потому что id БД формирует сама, а text - nullable
+        db.session.add(new_News)  # сохраняем объект класса 'News' в БД: кладем его в сессию SQLAlchemy
+        db.session.commit()  # после commit новость по факту сохранилась в мою БД
+
 
 # BeautifulSoup форрмирует из строки (которую мы скачали) "дом-дерево", т е дерево эл-тов (мы по ним можем делать поиск,
 # добавлять новые эл-ты, удалять старые). Нам сейчас нужен поиск и получение контента
 # BS исправляет часть огрехов html-документов (html - очень нестрогий формат. BS нивелирует такие вещи как незакрытые теги и пр
 # все, что наворочено в функции get_python_news(html), взято из структуры исходного кода веб-страницы
+
+# strptime (т е string parse time) парсит строку datetime по формату, который мы задали

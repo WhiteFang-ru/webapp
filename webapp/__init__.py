@@ -1,17 +1,21 @@
 # возвращаем в веб-приложении HTML вместо строки
 from flask import Flask, render_template
-from dataAnalysis import get_python_news
-from dataAnalysis import weather_by_city
+from webapp.model import db, News
+# from webapp.python_news import get_python_news
+from webapp.weather import weather_by_city
+
 
 def create_app():
-    app = Flask(__name__)
-    app.config.from_pyfile('config.py')
+    app = Flask(__name__)                # создаю Flask-приложение
+    app.config.from_pyfile('config.py')  # указываю, откуда брать константы
+    db.init_app(app)                     # инициализируем БД ПОСЛЕ config.py, т к в config.py лежит url
     @app.route('/')
     def index():
         title = 'Новости Python'        # переменная, которую мы вставляем в шаблон
         weather = weather_by_city(app.config['WEATHER_DEFAULT_CITY'])   # ('Moscow,Russia') - более ранний вариант
         # указания на город, до config.py Вытаскиваем константу "город" так же, как значение ключа словаря
-        news_list = get_python_news()  # вызываем функцию из парсера новостей
+        # news_list = get_python_news()  # вызываем функцию из парсера новостей (раняя редакция)
+        news_list = News.query.order_by(News.published.desc()).all() # делаю Выборку Всех новостей -> располагаю По Порядку (от Свежей к старой)
         return render_template('index.html', page_title=title, weather=weather, news_list=news_list)
         # news_list - шаблон новостей для функции. В render_template передаем название файла
         # с шаблоном в кавычках + другие аргументы
