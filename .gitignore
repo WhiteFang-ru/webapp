@@ -9,5 +9,5 @@ server.py
 config.py
 SQLAlchemy_intro.py
 database_intro.py
-*.bd
+*.db
 .DS_Store
